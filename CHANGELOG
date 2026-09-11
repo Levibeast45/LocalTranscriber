@@ -1,3 +1,9 @@
+1.0.7
+-----
+- Fix Listen mode freezes with audio from slow file providers
+- Fix freezes on Xclipse and PowerVR GPUs by falling back to CPU
+- Fix a crash when long background transcriptions reach Android's time limit
+
 1.0.6
 -----
 - Require Vulkan 1.2 for GPU acceleration as 1.1 is too unstable
