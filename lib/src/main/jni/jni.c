@@ -505,8 +505,13 @@ is_gpu_blocklisted(const char *desc)
 {
     /* Adreno 6xx-7xx series (tested until 730) cause VK_ERROR_DEVICE_LOST or
      * fail to link some shaders. Mesa/Turnip prefixes its own name onto the
-     * same silicon, so match anywhere rather than on the prefix. */
-    return strstr(desc, "Adreno") != NULL;
+     * same silicon, so match anywhere rather than on the prefix.
+     *
+     * Xclipse and PowerVR failures can wedge both ggml and HWUI in the shared
+     * GPU driver, resulting in an application ANR. */
+    return strstr(desc, "Adreno") != NULL ||
+           strstr(desc, "Xclipse") != NULL ||
+           strstr(desc, "PowerVR") != NULL;
 }
 
 /* Whisper keeps whatever backend it was constructed with, so this has to run
