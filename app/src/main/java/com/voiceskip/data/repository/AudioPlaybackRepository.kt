@@ -24,9 +24,7 @@ interface AudioPlaybackRepository {
     fun seekTo(positionMs: Long)
     fun cleanup()
 
-    /** Query the display name for a content URI */
-    fun getFileNameFromUri(uri: Uri): String?
+    suspend fun getFileNameFromUri(uri: Uri): String?
 
-    /** Take persistable read permission for a URI if possible */
-    fun takePersistablePermission(uri: Uri)
+    suspend fun takePersistablePermission(uri: Uri)
 }

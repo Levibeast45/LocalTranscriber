@@ -69,13 +69,11 @@ class AudioListenUseCase @Inject constructor(
         audioPlaybackRepository.cleanup()
     }
 
-    /** Query the display name for a content URI */
-    fun getFileNameFromUri(uri: Uri): String? {
+    suspend fun getFileNameFromUri(uri: Uri): String? {
         return audioPlaybackRepository.getFileNameFromUri(uri)
     }
 
-    /** Take persistable read permission for a URI if possible */
-    fun takePersistablePermission(uri: Uri) {
+    suspend fun takePersistablePermission(uri: Uri) {
         audioPlaybackRepository.takePersistablePermission(uri)
     }
 

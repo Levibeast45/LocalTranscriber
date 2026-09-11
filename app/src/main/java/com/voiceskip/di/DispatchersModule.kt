@@ -8,6 +8,7 @@ import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 
 @Module
 @InstallIn(SingletonComponent::class)
@@ -24,4 +25,10 @@ object DispatchersModule {
     @MainDispatcher
     @Provides
     fun provideMainDispatcher(): CoroutineDispatcher = Dispatchers.Main
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @ProviderCancellationDispatcher
+    @Provides
+    fun provideProviderCancellationDispatcher(): CoroutineDispatcher =
+        Dispatchers.IO.limitedParallelism(4)
 }

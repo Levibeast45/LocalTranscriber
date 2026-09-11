@@ -10,6 +10,8 @@ import com.voiceskip.data.repository.ModelRepository
 import com.voiceskip.data.repository.ModelRepositoryImpl
 import com.voiceskip.data.repository.TranscriptionRepository
 import com.voiceskip.data.repository.TranscriptionRepositoryImpl
+import com.voiceskip.data.source.AudioDocumentDataSource
+import com.voiceskip.data.source.AudioDocumentDataSourceImpl
 import com.voiceskip.data.source.DataStoreImportedModelStore
 import com.voiceskip.data.source.ImportedModelDocumentDataSource
 import com.voiceskip.data.source.ImportedModelDocumentDataSourceImpl
@@ -25,6 +27,12 @@ import javax.inject.Singleton
 @Module
 @InstallIn(SingletonComponent::class)
 abstract class DataModule {
+
+    @Binds
+    @Singleton
+    abstract fun bindAudioDocumentDataSource(
+        impl: AudioDocumentDataSourceImpl
+    ): AudioDocumentDataSource
 
     @Binds
     abstract fun bindTranscriptionRepository(

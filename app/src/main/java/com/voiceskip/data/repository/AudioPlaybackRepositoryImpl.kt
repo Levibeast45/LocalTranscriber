@@ -2,19 +2,22 @@
 
 package com.voiceskip.data.repository
 
-import android.content.Context
-import android.content.Intent
 import android.media.MediaPlayer
 import android.net.Uri
-import android.provider.OpenableColumns
 import com.voiceskip.data.ErrorHandler
+import com.voiceskip.data.source.AudioDocumentDataSource
 import com.voiceskip.di.MainDispatcher
-import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -22,6 +25,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.io.IOException
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -30,50 +34,97 @@ private const val POSITION_UPDATE_INTERVAL_MS = 200L
 
 @Singleton
 class AudioPlaybackRepositoryImpl @Inject constructor(
-    @ApplicationContext private val context: Context,
+    private val audioDocumentDataSource: AudioDocumentDataSource,
     private val mediaPlayerFactory: MediaPlayerFactory,
     @MainDispatcher private val mainDispatcher: CoroutineDispatcher
 ) : AudioPlaybackRepository {
 
     private var mediaPlayer: MediaPlayer? = null
     private var positionUpdateJob: Job? = null
+    private var pendingPreparation: CompletableDeferred<Unit>? = null
+    private var activePreparation: Deferred<Unit>? = null
+    private var playbackGeneration = 0L
     private val coroutineScope = CoroutineScope(SupervisorJob() + mainDispatcher)
 
     private val _playbackState = MutableStateFlow(PlaybackState())
     override val playbackState: StateFlow<PlaybackState> = _playbackState.asStateFlow()
 
-    override suspend fun preparePlayback(uri: Uri) = withContext(mainDispatcher) {
+    override suspend fun preparePlayback(uri: Uri) = coroutineScope {
+        val preparation = async(
+            context = mainDispatcher,
+            start = CoroutineStart.LAZY
+        ) {
+            preparePlaybackOnMain(uri)
+        }
+
+        withContext(mainDispatcher) {
+            activePreparation?.cancel()
+            activePreparation = preparation
+            preparation.start()
+        }
+
+        try {
+            preparation.await()
+        } finally {
+            withContext(NonCancellable + mainDispatcher) {
+                if (activePreparation === preparation) {
+                    activePreparation = null
+                }
+            }
+        }
+    }
+
+    private suspend fun preparePlaybackOnMain(uri: Uri) {
+        val generation = ++playbackGeneration
         releaseMediaPlayer()
         stopPositionUpdates()
         _playbackState.value = PlaybackState()
 
         try {
-            mediaPlayer = mediaPlayerFactory.create().apply {
-                setDataSource(context, uri)
-                prepare()
-                setOnCompletionListener {
-                    _playbackState.value = _playbackState.value.copy(
-                        isPlaying = false,
-                        currentPositionMs = 0
-                    )
-                    stopPositionUpdates()
+            val player = audioDocumentDataSource.withOpenAudio(uri) { descriptor ->
+                withContext(mainDispatcher) {
+                    if (generation != playbackGeneration) {
+                        null
+                    } else {
+                        mediaPlayerFactory.create().also { newPlayer ->
+                            mediaPlayer = newPlayer
+                            newPlayer.setOnCompletionListener { completedPlayer ->
+                                if (completedPlayer === mediaPlayer) {
+                                    _playbackState.value = _playbackState.value.copy(
+                                        isPlaying = false,
+                                        currentPositionMs = 0
+                                    )
+                                    stopPositionUpdates()
+                                }
+                            }
+                            newPlayer.setDataSource(descriptor)
+                        }
+                    }
                 }
-                setOnErrorListener { _, _, _ ->
-                    _playbackState.value = PlaybackState()
-                    stopPositionUpdates()
-                    releaseMediaPlayer()
-                    true
-                }
+            } ?: return
+
+            awaitPrepared(player)
+
+            if (generation != playbackGeneration || player !== mediaPlayer) {
+                return
             }
             _playbackState.value = PlaybackState(
                 isPrepared = true,
-                durationMs = mediaPlayer?.duration?.toLong() ?: 0
+                durationMs = player.duration.toLong()
             )
-        } catch (e: Exception) {
-            val whisperError = ErrorHandler.handleError(e)
+        } catch (exception: CancellationException) {
+            if (generation == playbackGeneration) {
+                _playbackState.value = PlaybackState()
+                releaseMediaPlayer()
+            }
+            throw exception
+        } catch (exception: Exception) {
+            val whisperError = ErrorHandler.handleError(exception)
             ErrorHandler.logError(LOG_TAG, whisperError, critical = false)
-            _playbackState.value = PlaybackState()
-            releaseMediaPlayer()
+            if (generation == playbackGeneration) {
+                _playbackState.value = PlaybackState()
+                releaseMediaPlayer()
+            }
             throw whisperError
         }
     }
@@ -119,43 +170,69 @@ class AudioPlaybackRepositoryImpl @Inject constructor(
     }
 
     override suspend fun stopPlayback() = withContext(mainDispatcher) {
+        playbackGeneration++
+        cancelActivePreparation()
         stopPositionUpdates()
         _playbackState.value = PlaybackState()
         releaseMediaPlayer()
     }
 
     override fun cleanup() {
-        coroutineScope.cancel()
+        playbackGeneration++
+        cancelActivePreparation()
         stopPositionUpdates()
         _playbackState.value = PlaybackState()
         releaseMediaPlayer()
     }
 
-    override fun getFileNameFromUri(uri: Uri): String? {
-        return try {
-            context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
-                if (cursor.moveToFirst()) {
-                    val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
-                    if (nameIndex >= 0) cursor.getString(nameIndex) else null
-                } else null
-            }
-        } catch (e: Exception) {
-            null
-        }
-    }
+    override suspend fun getFileNameFromUri(uri: Uri): String? =
+        audioDocumentDataSource.getDisplayName(uri)
 
-    override fun takePersistablePermission(uri: Uri) {
+    override suspend fun takePersistablePermission(uri: Uri) =
+        audioDocumentDataSource.takePersistableReadPermission(uri)
+
+    private suspend fun awaitPrepared(player: MediaPlayer) {
+        val preparation = CompletableDeferred<Unit>()
+        pendingPreparation = preparation
+
+        player.setOnPreparedListener { preparedPlayer ->
+            if (preparedPlayer === mediaPlayer) {
+                preparation.complete(Unit)
+            }
+        }
+        player.setOnErrorListener { failedPlayer, what, extra ->
+            if (failedPlayer !== mediaPlayer) {
+                true
+            } else if (preparation.completeExceptionally(
+                    IOException("MediaPlayer failed while preparing: what=$what extra=$extra")
+                )
+            ) {
+                true
+            } else {
+                _playbackState.value = PlaybackState()
+                stopPositionUpdates()
+                playbackGeneration++
+                releaseMediaPlayer()
+                true
+            }
+        }
+
         try {
-            context.contentResolver.takePersistableUriPermission(
-                uri,
-                Intent.FLAG_GRANT_READ_URI_PERMISSION
-            )
-        } catch (e: SecurityException) {
-            // Permission may not be persistable, continue anyway
+            player.prepareAsync()
+            preparation.await()
+        } finally {
+            if (pendingPreparation === preparation) {
+                pendingPreparation = null
+            }
+            if (player === mediaPlayer) {
+                player.setOnPreparedListener(null)
+            }
         }
     }
 
     private fun releaseMediaPlayer() {
+        pendingPreparation?.cancel()
+        pendingPreparation = null
         mediaPlayer?.let { player ->
             try {
                 if (player.isPlaying) {
@@ -181,6 +258,11 @@ class AudioPlaybackRepositoryImpl @Inject constructor(
             }
         }
         mediaPlayer = null
+    }
+
+    private fun cancelActivePreparation() {
+        activePreparation?.cancel()
+        activePreparation = null
     }
 
     private fun startPositionUpdates() {

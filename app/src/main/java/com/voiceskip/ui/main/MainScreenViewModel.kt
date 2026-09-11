@@ -31,6 +31,7 @@ import com.voiceskip.whispercpp.whisper.WhisperSegment
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -42,6 +43,8 @@ import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -168,17 +171,39 @@ class MainScreenViewModel @Inject constructor(
 
     private val _showFileSelector = MutableStateFlow(false)
     private val _pendingDelete = MutableStateFlow<SavedTranscription?>(null)
-    // Named rather than an anonymous object: four same-shaped nullables, so a mis-wire
-    // between them would otherwise compile silently.
+
+    private data class AudioDocumentState(
+        val uri: Uri?,
+        val displayName: String?
+    )
+
     private data class SecondaryState(
         val turboFallbackReason: ModelManager.TurboFallbackReason?,
         val transcriptionFailureReason: TranscriptionFailureReason?,
         val playbackState: PlaybackState,
-        val modelFallbackReason: ModelManager.ModelFallbackReason?
+        val modelFallbackReason: ModelManager.ModelFallbackReason?,
+        val audioDocument: AudioDocumentState
     )
 
     private val _transcriptionFailureReason = MutableStateFlow<TranscriptionFailureReason?>(null)
     private val pendingUriMutex = Mutex()
+    private var fileSelectionGeneration = 0L
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    private val audioDocumentState = repository.state
+        .map(::getAudioUri)
+        .distinctUntilChanged()
+        .mapLatest { uri ->
+            AudioDocumentState(
+                uri = uri,
+                displayName = uri?.let { audioListenUseCase.getFileNameFromUri(it) }
+            )
+        }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.Eagerly,
+            initialValue = AudioDocumentState(uri = null, displayName = null)
+        )
 
     val uiState: StateFlow<MainScreenUiState> = combine(
         combine(
@@ -196,6 +221,7 @@ class MainScreenViewModel @Inject constructor(
             _transcriptionFailureReason,
             audioListenUseCase.playbackState,
             modelManager.modelFallbackReason,
+            audioDocumentState,
             ::SecondaryState
         )
     ) { combined, settings, sessionLanguage, showFileSelector, secondary ->
@@ -208,20 +234,13 @@ class MainScreenViewModel @Inject constructor(
         val transcriptionFailureReason = secondary.transcriptionFailureReason
         val playbackState = secondary.playbackState
         val modelFallbackReason = secondary.modelFallbackReason
+        val audioDocument = secondary.audioDocument
 
         val canTranscribe = modelState is ModelManager.ModelState.Loaded && repoState is TranscriptionState.Idle
 
-        val currentAudioUri = when (repoState) {
-            is TranscriptionState.Transcribing -> repository.getCurrentTranscriptionSource()?.let { source ->
-                (source as? TranscriptionSource.FileUri)?.uri
-            }
-            is TranscriptionState.Complete -> repoState.audioUri
-            else -> null
-        }
+        val currentAudioUri = getAudioUri(repoState)
 
         val listenModeAvailable = currentAudioUri != null
-
-        val audioFileName = currentAudioUri?.let { audioListenUseCase.getFileNameFromUri(it) }
 
         val baseState = MainScreenUiState(
             canTranscribe = canTranscribe,
@@ -240,7 +259,9 @@ class MainScreenViewModel @Inject constructor(
             listenModeEnabled = settings.listenModeEnabled,
             listenModeAvailable = listenModeAvailable,
             audioUri = currentAudioUri,
-            audioFileName = audioFileName,
+            audioFileName = audioDocument
+                .takeIf { it.uri == currentAudioUri }
+                ?.displayName,
             playbackState = playbackState
         )
 
@@ -422,6 +443,12 @@ class MainScreenViewModel @Inject constructor(
                 return@launch
             }
 
+            if (savedStateHandle.get<Uri>("pending_uri") != uri) {
+                return@launch
+            }
+
+            audioListenUseCase.takePersistablePermission(uri)
+
             val shouldProcess = pendingUriMutex.withLock {
                 if (savedStateHandle.get<Uri>("pending_uri") != uri) {
                     false
@@ -553,15 +580,28 @@ class MainScreenViewModel @Inject constructor(
     }
 
     fun handleSelectedFile(uri: Uri) {
-        // Take persistable permission so we can access the file later for playback
-        audioListenUseCase.takePersistablePermission(uri)
+        val generation = ++fileSelectionGeneration
 
         if (!uiState.value.canTranscribe) {
             savedStateHandle["pending_uri"] = uri
+            viewModelScope.launch {
+                audioListenUseCase.takePersistablePermission(uri)
+            }
             return
         }
 
         viewModelScope.launch {
+            audioListenUseCase.takePersistablePermission(uri)
+
+            if (generation != fileSelectionGeneration) {
+                return@launch
+            }
+
+            if (!uiState.value.canTranscribe) {
+                savedStateHandle["pending_uri"] = uri
+                return@launch
+            }
+
             VoiceSkipLogger.logFileSelected(uri.toString())
             runCatching {
                 val defaultLang = settingsRepository.userSettings.first().defaultLanguage
@@ -574,6 +614,13 @@ class MainScreenViewModel @Inject constructor(
                 VoiceSkipLogger.e("Error loading file", exception)
             }
         }
+    }
+
+    private fun getAudioUri(state: TranscriptionState): Uri? = when (state) {
+        is TranscriptionState.Transcribing ->
+            (repository.getCurrentTranscriptionSource() as? TranscriptionSource.FileUri)?.uri
+        is TranscriptionState.Complete -> state.audioUri
+        else -> null
     }
 
     fun stopTranscription() {

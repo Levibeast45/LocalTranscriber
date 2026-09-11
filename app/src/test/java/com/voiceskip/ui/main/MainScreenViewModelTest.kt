@@ -31,12 +31,15 @@ import com.voiceskip.domain.ModelManager
 import com.voiceskip.domain.usecase.FormatSentencesUseCase
 import com.voiceskip.service.ServiceLauncher
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
@@ -85,6 +88,8 @@ class MainScreenViewModelTest {
 
         mockAudioListenUseCase = mockk(relaxed = true) {
             coEvery { stopPlayback() } just Runs
+            coEvery { getFileNameFromUri(any()) } returns null
+            coEvery { takePersistablePermission(any()) } just Runs
             every { playbackState } returns playbackStateFlow
         }
 
@@ -368,6 +373,130 @@ class MainScreenViewModelTest {
         viewModel.uiState.test {
             val state = awaitItem()
             assertThat(state.canTranscribe).isFalse()
+        }
+    }
+
+    @Test
+    fun `audio document name is resolved once while playback position changes`() = runTest {
+        val uri = mockk<Uri>()
+        coEvery { mockAudioListenUseCase.getFileNameFromUri(uri) } returns "meeting.opus"
+        fakeTranscriptionRepository.setCurrentTranscriptionSource(
+            TranscriptionSource.FileUri(uri)
+        )
+        fakeTranscriptionRepository.setState(
+            TranscriptionState.Transcribing(
+                progress = 10,
+                currentSegment = null,
+                segments = emptyList()
+            )
+        )
+        advanceUntilIdle()
+
+        repeat(5) { position ->
+            playbackStateFlow.value = PlaybackState(
+                isPlaying = true,
+                isPrepared = true,
+                currentPositionMs = position * 200L,
+                durationMs = 1000L
+            )
+        }
+        fakeTranscriptionRepository.setState(
+            TranscriptionState.Transcribing(
+                progress = 20,
+                currentSegment = null,
+                segments = emptyList()
+            )
+        )
+        advanceUntilIdle()
+
+        assertThat(viewModel.uiState.value.audioFileName).isEqualTo("meeting.opus")
+        coVerify(exactly = 1) { mockAudioListenUseCase.getFileNameFromUri(uri) }
+    }
+
+    @Test
+    fun `new audio URI does not wait for the previous display name`() = runTest {
+        val firstUri = mockk<Uri>()
+        val secondUri = mockk<Uri>()
+        val firstLookupStarted = CompletableDeferred<Unit>()
+        coEvery { mockAudioListenUseCase.getFileNameFromUri(firstUri) } coAnswers {
+            firstLookupStarted.complete(Unit)
+            awaitCancellation()
+        }
+        coEvery {
+            mockAudioListenUseCase.getFileNameFromUri(secondUri)
+        } returns "second.opus"
+        fakeTranscriptionRepository.setCurrentTranscriptionSource(
+            TranscriptionSource.FileUri(firstUri)
+        )
+        fakeTranscriptionRepository.setState(
+            TranscriptionState.Transcribing(
+                progress = 10,
+                currentSegment = null,
+                segments = emptyList()
+            )
+        )
+        runCurrent()
+        firstLookupStarted.await()
+
+        fakeTranscriptionRepository.setCurrentTranscriptionSource(
+            TranscriptionSource.FileUri(secondUri)
+        )
+        fakeTranscriptionRepository.setState(
+            TranscriptionState.Transcribing(
+                progress = 20,
+                currentSegment = null,
+                segments = emptyList()
+            )
+        )
+        advanceUntilIdle()
+
+        assertThat(viewModel.uiState.value.audioUri).isEqualTo(secondUri)
+        assertThat(viewModel.uiState.value.audioFileName).isEqualTo("second.opus")
+    }
+
+    @Test
+    fun `unavailable file selection is saved before permission completes`() = runTest {
+        val uri = mockk<Uri>()
+        val permissionGate = CompletableDeferred<Unit>()
+        coEvery { mockAudioListenUseCase.takePersistablePermission(uri) } coAnswers {
+            permissionGate.await()
+        }
+
+        viewModel.handleSelectedFile(uri)
+
+        assertThat(savedStateHandle.get<Uri>("pending_uri")).isEqualTo(uri)
+        permissionGate.complete(Unit)
+        advanceUntilIdle()
+    }
+
+    @Test
+    fun `older permission result cannot replace a newer file selection`() = runTest {
+        modelStateFlow.value = ModelManager.ModelState.Loaded("models/test.bin", "Test GPU")
+        fakeTranscriptionRepository.setState(TranscriptionState.Idle)
+        advanceUntilIdle()
+        val firstUri = mockk<Uri>()
+        val secondUri = mockk<Uri>()
+        val firstPermissionStarted = CompletableDeferred<Unit>()
+        val firstPermissionGate = CompletableDeferred<Unit>()
+        coEvery { mockAudioListenUseCase.takePersistablePermission(firstUri) } coAnswers {
+            firstPermissionStarted.complete(Unit)
+            firstPermissionGate.await()
+        }
+        coEvery { mockAudioListenUseCase.takePersistablePermission(secondUri) } just Runs
+
+        viewModel.handleSelectedFile(firstUri)
+        runCurrent()
+        firstPermissionStarted.await()
+        viewModel.handleSelectedFile(secondUri)
+        advanceUntilIdle()
+        firstPermissionGate.complete(Unit)
+        advanceUntilIdle()
+
+        coVerify(exactly = 0) {
+            mockServiceLauncher.startFileTranscription(firstUri, any())
+        }
+        coVerify(exactly = 1) {
+            mockServiceLauncher.startFileTranscription(secondUri, any())
         }
     }
 
