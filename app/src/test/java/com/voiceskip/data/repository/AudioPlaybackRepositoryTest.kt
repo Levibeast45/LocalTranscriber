@@ -100,6 +100,32 @@ class AudioPlaybackRepositoryTest {
     }
 
     @Test
+    fun `playback controls wait for asynchronous preparation`() = runTest {
+        val preparation = async { repository.preparePlayback(uri) }
+        runCurrent()
+
+        repository.play()
+        repository.pause()
+        repository.togglePlayPause()
+        repository.seekTo(70000)
+
+        verify(exactly = 0) { mediaPlayer.isPlaying }
+        verify(exactly = 0) { mediaPlayer.start() }
+        verify(exactly = 0) { mediaPlayer.pause() }
+        verify(exactly = 0) { mediaPlayer.duration }
+        verify(exactly = 0) { mediaPlayer.seekTo(any<Int>()) }
+
+        preparedListener?.onPrepared(mediaPlayer)
+        runCurrent()
+        preparation.await()
+
+        repository.seekTo(70000)
+
+        verify(exactly = 1) { mediaPlayer.seekTo(60000) }
+        assertThat(repository.playbackState.value.currentPositionMs).isEqualTo(60000)
+    }
+
+    @Test
     fun `preparation error resets and releases the player`() = runTest {
         val preparation = async { runCatching { repository.preparePlayback(uri) } }
         runCurrent()

@@ -130,44 +130,43 @@ class AudioPlaybackRepositoryImpl @Inject constructor(
     }
 
     override fun play() {
-        mediaPlayer?.let { player ->
-            if (!player.isPlaying) {
-                player.start()
-                _playbackState.value = _playbackState.value.copy(isPlaying = true)
-                startPositionUpdates()
-            }
+        val player = preparedPlayer() ?: return
+        if (!player.isPlaying) {
+            player.start()
+            _playbackState.value = _playbackState.value.copy(isPlaying = true)
+            startPositionUpdates()
         }
     }
 
     override fun pause() {
-        mediaPlayer?.let { player ->
-            if (player.isPlaying) {
-                player.pause()
-                _playbackState.value = _playbackState.value.copy(isPlaying = false)
-                stopPositionUpdates()
-            }
+        val player = preparedPlayer() ?: return
+        if (player.isPlaying) {
+            player.pause()
+            _playbackState.value = _playbackState.value.copy(isPlaying = false)
+            stopPositionUpdates()
         }
     }
 
     override fun togglePlayPause() {
-        mediaPlayer?.let { player ->
-            if (player.isPlaying) {
-                pause()
-            } else {
-                play()
-            }
+        val player = preparedPlayer() ?: return
+        if (player.isPlaying) {
+            pause()
+        } else {
+            play()
         }
     }
 
     override fun seekTo(positionMs: Long) {
-        mediaPlayer?.let { player ->
-            val clampedPosition = positionMs.coerceIn(0, player.duration.toLong())
-            player.seekTo(clampedPosition.toInt())
-            _playbackState.value = _playbackState.value.copy(
-                currentPositionMs = clampedPosition
-            )
-        }
+        val player = preparedPlayer() ?: return
+        val clampedPosition = positionMs.coerceIn(0, player.duration.toLong())
+        player.seekTo(clampedPosition.toInt())
+        _playbackState.value = _playbackState.value.copy(
+            currentPositionMs = clampedPosition
+        )
     }
+
+    private fun preparedPlayer(): MediaPlayer? =
+        mediaPlayer?.takeIf { _playbackState.value.isPrepared }
 
     override suspend fun stopPlayback() = withContext(mainDispatcher) {
         playbackGeneration++

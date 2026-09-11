@@ -593,7 +593,11 @@ private fun TranscribingScreen(
                     formatText = formatText,
                     listenModeEnabled = listenModeEnabled,
                     playbackPositionMs = playbackState.currentPositionMs,
-                    onSegmentClick = if (listenModeEnabled) onSegmentClick else null
+                    onSegmentClick = if (listenModeEnabled && playbackState.isPrepared) {
+                        onSegmentClick
+                    } else {
+                        null
+                    }
                 )
             }
         } else if (!isComplete) {
