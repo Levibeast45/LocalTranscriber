@@ -44,6 +44,7 @@ class TranscriptionService : Service() {
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private var stateObserverJob: Job? = null
     private var hasSeenActiveState = false
+    private var isStopping = false
 
     override fun onCreate() {
         super.onCreate()
@@ -80,15 +81,18 @@ class TranscriptionService : Service() {
                 }
             }
             ACTION_CANCEL -> {
-                when (repository.state.value) {
-                    is TranscriptionState.LiveRecording -> repository.cancelRecording()
-                    is TranscriptionState.FinishingTranscription -> repository.cancelTranscription()
-                    is TranscriptionState.Transcribing -> repository.cancelTranscription()
-                    else -> {}
-                }
+                cancelActiveWork(repository)
             }
         }
         return START_NOT_STICKY
+    }
+
+    override fun onTimeout(startId: Int, fgsType: Int) {
+        Log.w(TAG, "Foreground service timed out: startId=$startId, type=$fgsType")
+        if (!beginStopping()) return
+
+        cancelActiveWork(repository)
+        leaveForeground()
     }
 
     private fun tryStartForeground(notification: Notification, foregroundServiceType: Int): Boolean {
@@ -142,6 +146,21 @@ class TranscriptionService : Service() {
     }
 
     private fun stopSelfGracefully(resultNotification: Notification? = null) {
+        if (!beginStopping()) return
+
+        leaveForeground(resultNotification)
+    }
+
+    private fun beginStopping(): Boolean {
+        if (isStopping) return false
+
+        isStopping = true
+        stopSelf()
+        stateObserverJob?.cancel()
+        return true
+    }
+
+    private fun leaveForeground(resultNotification: Notification? = null) {
         wakeLockManager.release()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
             stopForeground(STOP_FOREGROUND_REMOVE)
@@ -156,7 +175,6 @@ class TranscriptionService : Service() {
                 manager.notify(RESULT_NOTIFICATION_ID, it)
             }
         }
-        stopSelf()
     }
 
     private fun createNotificationChannel() {
@@ -297,5 +315,14 @@ class TranscriptionService : Service() {
         private const val REQUEST_CODE_FOREGROUND = 0
         private const val REQUEST_CODE_COMPLETION = 1
         private const val REQUEST_CODE_ERROR = 2
+    }
+}
+
+internal fun cancelActiveWork(repository: TranscriptionRepository) {
+    when (repository.state.value) {
+        is TranscriptionState.LiveRecording -> repository.cancelRecording()
+        is TranscriptionState.FinishingTranscription,
+        is TranscriptionState.Transcribing -> repository.cancelTranscription()
+        else -> Unit
     }
 }
