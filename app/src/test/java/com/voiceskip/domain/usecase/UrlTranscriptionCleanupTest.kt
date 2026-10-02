@@ -23,10 +23,9 @@ class UrlTranscriptionCleanupTest {
 
     @Test fun `failed downloads clean partial media and never start whisper`() = runTest {
         val context = mockk<Context> { every { cacheDir } returns folder.root }
-        val uri = mockk<Uri> {
-            every { scheme } returns "https"
-            every { toString() } returns "https://example.com/audio"
-        }
+        val uri = mockk<Uri>()
+        every { uri.scheme } returns "https"
+        every { uri.toString() } returns "https://example.com/audio"
         val whisper = mockk<WhisperDataSource>(relaxed = true)
         val downloader = mockk<UrlMediaDownloader>()
         coEvery { downloader.download(any(), any(), any()) } coAnswers {
@@ -47,10 +46,9 @@ class UrlTranscriptionCleanupTest {
 
     @Test fun `cancellation removes partial download and propagates to downloader`() = runTest {
         val context = mockk<Context> { every { cacheDir } returns folder.root }
-        val uri = mockk<Uri> {
-            every { scheme } returns "https"
-            every { toString() } returns "https://example.com/audio"
-        }
+        val uri = mockk<Uri>()
+        every { uri.scheme } returns "https"
+        every { uri.toString() } returns "https://example.com/audio"
         val downloader = mockk<UrlMediaDownloader>()
         var cancelled = false
         coEvery { downloader.download(any(), any(), any()) } coAnswers {

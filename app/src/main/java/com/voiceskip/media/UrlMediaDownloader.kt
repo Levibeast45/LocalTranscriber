@@ -27,44 +27,43 @@ class UrlMediaDownloader @Inject constructor(
         val processId = UUID.randomUUID().toString()
         try {
             return coroutineScope {
-              val worker = async(Dispatchers.IO) {
-                check(directory.mkdirs() || directory.isDirectory)
-                YoutubeDL.getInstance().init(context)
-                FFmpeg.getInstance().init(context)
-                val request = YoutubeDLRequest(url).apply {
-                    addOption("--no-playlist")
-                    addOption("--playlist-items", "1")
-                    addOption("--socket-timeout", 30)
-                    addOption("--retries", 3)
-                    addOption("--max-filesize", "500M")
-                    addOption("--match-filter", "!is_live & duration <=? 14400")
-                    addOption("-f", "bestaudio/best")
-                    addOption("-x")
-                    addOption("--audio-format", "m4a")
-                    addOption("--postprocessor-args", "ffmpeg:-ac 1 -ar 16000")
-                    addOption("-o", File(directory, "audio.%(ext)s").absolutePath)
+                val worker = async(Dispatchers.IO) {
+                    check(directory.mkdirs() || directory.isDirectory)
+                    YoutubeDL.getInstance().init(context)
+                    FFmpeg.getInstance().init(context)
+                    val request = YoutubeDLRequest(url).apply {
+                        addOption("--no-playlist")
+                        addOption("--playlist-items", "1")
+                        addOption("--socket-timeout", 30)
+                        addOption("--retries", 3)
+                        addOption("--max-filesize", "500M")
+                        addOption("--match-filter", "!is_live & duration <=? 14400")
+                        addOption("-f", "bestaudio[ext=m4a]/bestaudio/best")
+                        addOption("-x")
+                        addOption("--audio-format", "m4a")
+                        addOption("-o", File(directory, "audio.%(ext)s").absolutePath)
+                    }
+                    YoutubeDL.getInstance().execute(request, processId) { progress, _, _ ->
+                        onProgress(progress.toInt().coerceIn(0, 100))
+                    }
+                    File(directory, "audio.m4a").also {
+                        if (!it.isFile || it.length() <= 44) throw IOException("No audio was found in this link.")
+                    }
                 }
-                YoutubeDL.getInstance().execute(request, processId) { progress, _, _ ->
-                    onProgress(progress.toInt().coerceIn(0, 100))
+                try {
+                    worker.await()
+                } catch (e: CancellationException) {
+                    // Request native cancellation before allowing the caller to delete
+                    // its files. Cancellation can race initialization
+                    // or process registration, so keep checking until the worker exits.
+                    withContext(NonCancellable + Dispatchers.IO) {
+                        while (!worker.isCompleted) {
+                            YoutubeDL.getInstance().destroyProcessById(processId)
+                            delay(100)
+                        }
+                    }
+                    throw e
                 }
-                File(directory, "audio.m4a").also {
-                    if (!it.isFile || it.length() <= 44) throw IOException("No audio was found in this link.")
-                }
-              }
-              try {
-                  worker.await()
-              } catch (e: CancellationException) {
-                  // Request native cancellation before allowing the caller to delete
-                  // its files. Cancellation can race initialization
-                  // or process registration, so keep checking until the worker exits.
-                  withContext(NonCancellable + Dispatchers.IO) {
-                      while (!worker.isCompleted) {
-                          YoutubeDL.getInstance().destroyProcessById(processId)
-                          delay(100)
-                      }
-                  }
-                  throw e
-              }
             }
         } catch (e: CancellationException) {
             throw e

@@ -134,7 +134,7 @@
 
     <!-- Settings - About -->
     <string name="settings_section_about">About</string>
-    <string name="settings_about_privacy">All processing happens locally on your device, ensuring complete privacy.</string>
+    <string name="settings_about_privacy">Speech recognition runs on your device. Media links are downloaded from their hosting services.</string>
     <string name="settings_about_version">Version</string>
     <string name="settings_about_license">License</string>
     <string name="settings_about_license_name">GPL-3.0-or-later</string>
