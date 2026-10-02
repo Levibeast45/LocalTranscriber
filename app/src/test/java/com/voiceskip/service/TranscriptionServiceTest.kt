@@ -34,6 +34,12 @@ class TranscriptionServiceTest {
     fun `active work cancellation routes file states to transcription cancellation`() {
         val activeStates = listOf(
             TranscriptionState.Transcribing(
+                progress = 10,
+                currentSegment = null,
+                segments = emptyList(),
+                downloading = true
+            ),
+            TranscriptionState.Transcribing(
                 progress = 25,
                 currentSegment = null,
                 segments = emptyList()

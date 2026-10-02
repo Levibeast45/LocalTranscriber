@@ -156,8 +156,11 @@ class FileTranscriptionUseCase @Inject constructor(
 
             eventJob.join()
         } finally {
-            providerToRelease?.release()
-            temporaryDirectory?.deleteRecursively()
+            try {
+                providerToRelease?.release()
+            } finally {
+                temporaryDirectory?.deleteRecursively()
+            }
         }
     }
 }

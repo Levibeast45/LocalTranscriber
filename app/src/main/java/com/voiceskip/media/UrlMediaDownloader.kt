@@ -33,10 +33,11 @@ class UrlMediaDownloader @Inject constructor(
                 FFmpeg.getInstance().init(context)
                 val request = YoutubeDLRequest(url).apply {
                     addOption("--no-playlist")
+                    addOption("--playlist-items", "1")
                     addOption("--socket-timeout", 30)
                     addOption("--retries", 3)
                     addOption("--max-filesize", "500M")
-                    addOption("--match-filter", "!is_live & duration <= 14400")
+                    addOption("--match-filter", "!is_live & duration <=? 14400")
                     addOption("-f", "bestaudio/best")
                     addOption("-x")
                     addOption("--audio-format", "m4a")
@@ -53,8 +54,8 @@ class UrlMediaDownloader @Inject constructor(
               try {
                   worker.await()
               } catch (e: CancellationException) {
-                  // Kill the complete yt-dlp/FFmpeg process tree before allowing the
-                  // caller to delete its files. Cancellation can race initialization
+                  // Request native cancellation before allowing the caller to delete
+                  // its files. Cancellation can race initialization
                   // or process registration, so keep checking until the worker exits.
                   withContext(NonCancellable + Dispatchers.IO) {
                       while (!worker.isCompleted) {

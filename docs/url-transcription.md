@@ -2,7 +2,8 @@
 
 LocalTranscriber is a GPL-3.0-or-later fork of VoiceSkip. The existing Kotlin,
 Compose, Hilt, foreground service, MediaExtractor/MediaCodec and whisper.cpp
-pipeline remains the foundation. Native CPU/Vulkan code is unchanged.
+pipeline remains the foundation. Native inference code is unchanged; CMake now
+locates the host shader compiler bundled with the pinned Android NDK.
 
 ## Flow
 
