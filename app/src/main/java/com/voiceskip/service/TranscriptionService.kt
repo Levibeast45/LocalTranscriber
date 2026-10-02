@@ -123,7 +123,7 @@ class TranscriptionService : Service() {
                     is TranscriptionState.Transcribing -> {
                         hasSeenActiveState = true
                         wakeLockManager.ping()
-                        updateNotification(createTranscribingNotification(state.progress))
+                        updateNotification(createTranscribingNotification(state.progress, state.downloading))
                     }
                     is TranscriptionState.Complete -> {
                         if (hasSeenActiveState) {
@@ -226,9 +226,9 @@ class TranscriptionService : Service() {
         )
     }
 
-    private fun createTranscribingNotification(progress: Int): Notification {
+    private fun createTranscribingNotification(progress: Int, downloading: Boolean = false): Notification {
         return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle(getString(R.string.state_transcribing))
+            .setContentTitle(getString(if (downloading) R.string.state_downloading else R.string.state_transcribing))
             .setContentText("$progress%")
             .setProgress(100, progress, false)
             .setSmallIcon(R.drawable.ic_notification)

@@ -46,6 +46,7 @@ import androidx.compose.ui.unit.dp
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.isGranted
 import com.google.accompanist.permissions.rememberPermissionState
+import com.voiceskip.media.MediaUrl
 import com.voiceskip.R
 import com.voiceskip.data.UserPreferences
 import com.voiceskip.data.repository.PlaybackState
@@ -108,6 +109,7 @@ fun MainScreen(
     viewModel: MainScreenViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val urlDraft by viewModel.urlDraft.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     var pendingFileUri by remember { mutableStateOf<android.net.Uri?>(null) }
 
@@ -188,6 +190,7 @@ fun MainScreen(
 
     MainScreenContent(
         uiState = uiState,
+        urlDraft = urlDraft,
         onAction = viewModel::handleAction,
         onNavigateToSettings = onNavigateToSettings,
         onSelectFile = {
@@ -202,6 +205,7 @@ fun MainScreen(
 @Composable
 private fun MainScreenContent(
     uiState: MainScreenUiState,
+    urlDraft: String,
     onAction: (MainScreenAction) -> Unit,
     onNavigateToSettings: () -> Unit,
     onSelectFile: () -> Unit,
@@ -254,6 +258,9 @@ private fun MainScreenContent(
 
                 is TranscriptionUiState.Ready -> ReadyScreen(
                     canTranscribe = uiState.canTranscribe,
+                    urlDraft = urlDraft,
+                    onUrlChange = { onAction(MainScreenAction.EditUrl(it)) },
+                    onTranscribeUrl = { onAction(MainScreenAction.TranscribeUrl) },
                     hasSavedTranscription = uiState.hasSavedTranscription,
                     onToggleRecord = { onAction(MainScreenAction.ToggleRecord) },
                     onSelectFile = onSelectFile,
@@ -282,6 +289,7 @@ private fun MainScreenContent(
                         progress = uiState.transcriptionProgress,
                         segments = uiState.transcriptionSegments,
                         isComplete = false,
+                        downloading = uiState.downloading,
                         detectedLanguage = uiState.detectedLanguage,
                         currentLanguage = uiState.language,
                         onLanguageChange = { language ->
@@ -357,6 +365,9 @@ private fun LoadingScreen() {
 @Composable
 private fun ReadyScreen(
     canTranscribe: Boolean,
+    urlDraft: String,
+    onUrlChange: (String) -> Unit,
+    onTranscribeUrl: () -> Unit,
     hasSavedTranscription: Boolean,
     onToggleRecord: () -> Unit,
     onSelectFile: () -> Unit,
@@ -366,10 +377,29 @@ private fun ReadyScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(16.dp),
+            .padding(16.dp)
+            .verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
+        val validUrl = MediaUrl.parse(urlDraft) != null
+        OutlinedTextField(
+            value = urlDraft,
+            onValueChange = onUrlChange,
+            label = { Text(stringResource(R.string.url_label)) },
+            placeholder = { Text(stringResource(R.string.url_hint)) },
+            isError = urlDraft.isNotBlank() && !validUrl,
+            supportingText = {
+                Text(stringResource(if (urlDraft.isNotBlank() && !validUrl) R.string.url_invalid else R.string.url_privacy))
+            },
+            modifier = Modifier.fillMaxWidth(),
+            maxLines = 3
+        )
+        Button(onClick = onTranscribeUrl, enabled = canTranscribe && validUrl) {
+            Text(stringResource(R.string.url_start))
+        }
+        Spacer(modifier = Modifier.height(16.dp))
+
         if (LIVE_RECORDING_ENABLED) {
             RecordActionCard(
                 canTranscribe = canTranscribe,
@@ -560,6 +590,7 @@ private fun TranscribingScreen(
     progress: Int,
     segments: List<com.voiceskip.whispercpp.whisper.WhisperSegment>,
     isComplete: Boolean,
+    downloading: Boolean = false,
     detectedLanguage: String? = null,
     currentLanguage: String = UserPreferences.LANGUAGE_AUTO,
     onLanguageChange: ((String) -> Unit)? = null,
@@ -611,7 +642,7 @@ private fun TranscribingScreen(
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = stringResource(R.string.msg_transcription_delay_file),
+                        text = stringResource(if (downloading) R.string.url_downloading else R.string.msg_transcription_delay_file),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )

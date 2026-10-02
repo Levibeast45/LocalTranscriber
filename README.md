@@ -1,6 +1,6 @@
-# VoiceSkip
+# LocalTranscriber
 
-Android app for audio/video transcription using whisper.cpp.
+Android app for local audio/video transcription using whisper.cpp, forked from [VoiceSkip](https://github.com/tguillem/VoiceSkip).
 
 ## Features
 
@@ -12,7 +12,23 @@ Android app for audio/video transcription using whisper.cpp.
   model (ggml-small-q8_0)
 - Background transcription with foreground service
 - Listen mode: play audio and review your transcription
-- Fully offline and open source
+- Local transcription; internet is used only when retrieving URL media
+- Paste a media link or use Android Share → LocalTranscriber
+
+## Install on S24 Ultra
+
+Open the latest successful **Android APK** run in this repository's Actions tab.
+Download **LocalTranscriber-arm64-debug**, extract the ZIP and install the APK
+on your phone. Allow installation from the app you use to open the APK when
+Android asks. No root is required. The models are bundled, so the APK is large.
+
+Open LocalTranscriber, wait for the model to load, then choose a local file or
+paste a public media link and tap **Transcribe link**. You can also share a link
+from another app; review the prefilled link and tap **Transcribe link**.
+
+The APK has a separate identity from VoiceSkip. This is a debug build for
+personal testing; see [architecture and limitations](docs/url-transcription.md),
+including signing-key differences between CI runs.
 
 ## Supported Languages
 

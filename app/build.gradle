@@ -24,7 +24,7 @@ android {
     }
 
     defaultConfig {
-        applicationId "com.voiceskip"
+        applicationId "com.levibeast.localtranscriber"
         minSdk 33
         targetSdk 36
         versionCode 20
@@ -37,6 +37,7 @@ android {
 
         ndk {
             debugSymbolLevel 'FULL'
+            if (project.hasProperty('targetAbi')) abiFilters project.property('targetAbi')
         }
     }
 
@@ -62,7 +63,7 @@ android {
     // Packaging options for 16 KB alignment
     packaging {
         jniLibs {
-            useLegacyPackaging = false
+            useLegacyPackaging = true // yt-dlp executes bundled Python/FFmpeg from nativeLibraryDir
         }
     }
     compileOptions {
@@ -100,6 +101,8 @@ android {
 
 dependencies {
     implementation project(':lib')
+    implementation 'io.github.junkfood02.youtubedl-android:library:0.18.1'
+    implementation 'io.github.junkfood02.youtubedl-android:ffmpeg:0.18.1'
 
     implementation platform('androidx.compose:compose-bom:2024.12.01')
     androidTestImplementation platform('androidx.compose:compose-bom:2024.12.01')

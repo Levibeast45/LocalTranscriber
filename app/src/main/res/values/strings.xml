@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">VoiceSkip</string>
+    <string name="app_name">LocalTranscriber</string>
 
     <!-- Actions -->
     <string name="action_record">Record audio</string>
@@ -166,4 +166,11 @@
     <string name="oss_whisper_copyright" translatable="false">Copyright (c) 2023–2024 The ggml authors</string>
     <string name="oss_whisper_license" translatable="false">MIT License</string>
     <string name="oss_jetpack_notice" translatable="false">Android Jetpack libraries are licensed under the Apache License 2.0.</string>
+    <string name="url_label">Media link</string>
+    <string name="url_hint">Paste one public HTTP or HTTPS link</string>
+    <string name="url_start">Transcribe link</string>
+    <string name="url_invalid">Enter one valid HTTP or HTTPS link.</string>
+    <string name="url_privacy">The media is downloaded first. Transcription runs on this device.</string>
+    <string name="state_downloading">Downloading audio</string>
+    <string name="url_downloading">Retrieving and preparing audio…</string>
 </resources>
