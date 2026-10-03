@@ -111,3 +111,7 @@ Foundation, either version 3 of the License, or (at your option) any later
 version.
 
 See [LICENSE](LICENSE) for details.
+
+### Experimental S24 Ultra GPU trial (1.0.9)
+
+GPU acceleration is now opt-in and starts disabled, including after an update. The native policy permits Adreno 750 for an explicit trial; other Adreno, Xclipse and PowerVR devices remain blocked. Enable **GPU acceleration (experimental)** in Settings, then test a short recording before a long job. Successful model loading alone does not validate transcription stability or speed. Recoverable errors retain CPU fallback; after a native crash, restart the app to allow the existing crash marker to disable GPU. A failed GPU context cannot be retried in the same process. Hardware validation on the S24 Ultra is still required.

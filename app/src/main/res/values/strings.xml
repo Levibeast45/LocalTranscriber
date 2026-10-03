@@ -46,7 +46,7 @@
     <string name="tip_share_desc">Transcribe audio or video from any app</string>
 
     <!-- Messages -->
-    <string name="msg_gpu_unavailable">GPU unavailable, using CPU</string>
+    <string name="msg_gpu_unavailable">GPU initialization failed or device blocked; using CPU</string>
     <string name="msg_gpu_crash">GPU caused a crash, using CPU</string>
     <string name="msg_turbo_crash">Turbo mode caused a crash, disabled</string>
     <string name="msg_copied">Copied to clipboard</string>
@@ -104,12 +104,12 @@
 
     <!-- Settings - Performance -->
     <string name="settings_section_performance">Performance</string>
-    <string name="settings_gpu_title">GPU acceleration</string>
+    <string name="settings_gpu_title">GPU acceleration (experimental)</string>
     <string name="settings_gpu_device">Using %s</string>
     <string name="settings_gpu_loading">Loading model with GPU…</string>
-    <string name="settings_gpu_disabled">CPU-only processing</string>
+    <string name="settings_gpu_disabled">Off by default. Adreno 750 testing may crash the app.</string>
     <string name="settings_gpu_requires_vulkan_1_2">GPU acceleration requires Vulkan 1.2 or newer</string>
-    <string name="settings_gpu_failed">GPU acceleration failed</string>
+    <string name="settings_gpu_failed">GPU initialization failed or this GPU is blocked. Restart the app before retrying.</string>
     <string name="settings_threads_title">CPU threads</string>
     <string name="settings_threads_desc_gpu">CPU threads for hybrid GPU/CPU processing</string>
     <string name="settings_threads_desc_cpu">Number of CPU threads for processing</string>
