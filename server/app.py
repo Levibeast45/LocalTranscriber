@@ -89,6 +89,13 @@ def create_app(data_dir=None, engine=None):
     with db() as c:
         c.execute("CREATE TABLE IF NOT EXISTS jobs (id TEXT PRIMARY KEY, created REAL, status TEXT, progress INTEGER, source TEXT, language TEXT, result TEXT, error TEXT)")
         c.execute("UPDATE jobs SET status='error', error='Traitement interrompu par le redémarrage du PC. Relance-le.' WHERE status IN ('downloading','transcribing')")
+        queued = {r[0] for r in c.execute("SELECT id FROM jobs WHERE status='queued'")}
+    # Remove only this service's UUID job folders, including files left by a crash.
+    for folder in data.iterdir():
+        if (folder.is_dir() and len(folder.name) == 32
+                and all(ch in "0123456789abcdef" for ch in folder.name)
+                and folder.name not in queued):
+            shutil.rmtree(folder, ignore_errors=True)
 
     def update(id, **values):
         with db() as c:

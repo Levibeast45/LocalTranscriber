@@ -92,3 +92,14 @@ def test_engine_loads_cuda_fp16_only(monkeypatch):
     monkeypatch.setitem(sys.modules, 'faster_whisper', SimpleNamespace(WhisperModel=load))
     CudaEngine('local-model').load()
     assert calls == [dict(device='cuda', compute_type='float16', local_files_only=True, num_workers=1)]
+
+
+def test_startup_removes_orphan_media_only(tmp_path):
+    orphan = tmp_path / ('a' * 32)
+    orphan.mkdir()
+    (orphan / 'media.mp3').write_bytes(b'temporary')
+    keep = tmp_path / 'personal'
+    keep.mkdir()
+    create_app(tmp_path, FakeEngine())
+    assert not orphan.exists()
+    assert keep.exists()
