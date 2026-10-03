@@ -9,3 +9,7 @@ app-release.aab
 .cxx
 local.properties
 lib/src/main/jni/stream_test
+__pycache__/
+.pytest_cache/
+server/.venv/
+server/.data/
