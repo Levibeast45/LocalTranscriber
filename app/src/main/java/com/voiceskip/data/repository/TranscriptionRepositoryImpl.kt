@@ -208,6 +208,14 @@ class TranscriptionRepositoryImpl @Inject constructor(
                     vadEnabled = settings.vadEnabled
                 ).collect { progress ->
                     when (progress) {
+                        is FileTranscriptionUseCase.Progress.Downloading -> {
+                            _state.value = TranscriptionState.Transcribing(
+                                progress = progress.percent,
+                                currentSegment = null,
+                                segments = emptyList(),
+                                downloading = true
+                            )
+                        }
                         is FileTranscriptionUseCase.Progress.Transcribing -> {
                             _state.value = TranscriptionState.Transcribing(
                                 progress = progress.progressPercent,
@@ -224,7 +232,7 @@ class TranscriptionRepositoryImpl @Inject constructor(
                                 detectedLanguage = progress.detectedLanguage,
                                 audioLengthMs = progress.audioLengthMs,
                                 processingTimeMs = progress.processingTimeMs,
-                                audioUri = uri
+                                audioUri = uri?.takeUnless { it.scheme?.lowercase() in setOf("http", "https") }
                             )
                         }
                         is FileTranscriptionUseCase.Progress.Failed -> {

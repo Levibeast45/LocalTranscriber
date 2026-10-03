@@ -19,7 +19,7 @@ import com.voiceskip.BuildConfig
 import com.voiceskip.R
 import com.voiceskip.ui.theme.Spacing
 
-private val SOURCE_CODE_URL: String? = "https://github.com/tguillem/VoiceSkip"
+private val SOURCE_CODE_URL: String? = "https://github.com/Levibeast45/LocalTranscriber"
 
 @Composable
 fun AboutSection() {

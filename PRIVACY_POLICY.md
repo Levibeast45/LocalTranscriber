@@ -1,81 +1,32 @@
-# Privacy Policy for VoiceSkip
+# Privacy Policy for LocalTranscriber
 
-**Last updated:** July 24, 2026
+Last updated: October 2, 2026
 
-## Overview
+LocalTranscriber is a fork of VoiceSkip. Speech recognition runs on your device
+using whisper.cpp. No audio or transcript is uploaded to a transcription service.
 
-VoiceSkip is an audio and video transcription application that processes all
-data locally on your device. This privacy policy explains how VoiceSkip handles
-your data.
+## Media links
 
-## Data Collection
+When you start transcription of a link, yt-dlp and FFmpeg retrieve the media from
+the hosting service and its delivery servers. Those services receive normal
+network requests, including your IP address and the requested link, under their
+own privacy policies. Local-file transcription does not require this download.
+No login cookies, accounts, analytics or advertising services are integrated.
 
-**VoiceSkip does not collect, store, or transmit any personal data to external
-servers.**
+Downloaded media is held in private cache storage and deleted after processing,
+cancellation or failure. If Android kills the process, temporary files may remain
+until the app cache is cleared. Downloaded audio is not retained for listen mode.
 
-All transcription processing occurs entirely on your device using the
-whisper.cpp library. No audio, video, or transcription data ever leaves your
-device.
+## Local storage and permissions
 
-## Permissions Used
+- Internet: retrieve the media from links you submit.
+- Foreground service, notifications and wake lock: keep processing visible and
+  active in the background.
+- System file picker: read only the local media/model files you select. Imported
+  files may retain a read grant for later use. No broad storage access is requested.
+- Saved transcripts and preferences remain in the app's local storage. You may
+  copy or share a transcript yourself using the existing Android controls.
+- Delete a saved transcript in the app, or clear app storage/uninstall to remove
+  all app data. App backup is disabled.
 
-VoiceSkip requests the following permissions:
-
-- **File access:** Audio and video files you open with the system file picker or
-  share into VoiceSkip are read locally for transcription. VoiceSkip does not
-  request storage or media permissions.
-
-- **Notifications (POST_NOTIFICATIONS):** Used to display transcription
-  progress while the app runs in the background.
-
-- **Wake Lock (WAKE_LOCK):** Prevents the device from sleeping during
-  transcription to ensure processing completes.
-
-- **Imported models:** If you import your own whisper model file, VoiceSkip
-  keeps a lasting read permission for that file so it can load it again on
-  later launches. The file is not copied. Removing the model in Settings
-  removes its reference from VoiceSkip and asks Android to release the read
-  permission.
-
-## Data Storage
-
-- Transcription results are stored only on your device in the app's local
-  storage.
-- VoiceSkip does not use cloud storage or external databases.
-- You can delete all app data by clearing the app's data or uninstalling the
-  app.
-
-## Third-Party Services
-
-VoiceSkip does not integrate with any third-party services, analytics
-platforms, advertising networks, or cloud services. The app functions entirely
-offline.
-
-## Data Sharing
-
-VoiceSkip does not share any data with third parties because it does not
-collect any data.
-
-## Children's Privacy
-
-VoiceSkip does not knowingly collect any personal information from anyone,
-including children under 13.
-
-## Changes to This Policy
-
-We may update this privacy policy from time to time. Any changes will be posted
-on this page with an updated revision date.
-
-## Contact
-
-If you have questions about this privacy policy, please open an issue on our
-GitHub repository or contact us at:
-
-**GitHub:**
-[https://github.com/tguillem/VoiceSkip](https://github.com/tguillem/VoiceSkip)
-
-## Your Rights
-
-Since VoiceSkip does not collect any personal data, there is no personal data
-to access, modify, or delete from our systems. All your data remains on your
-device under your control.
+Source code: https://github.com/Levibeast45/LocalTranscriber
