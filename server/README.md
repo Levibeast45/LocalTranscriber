@@ -13,17 +13,17 @@ server/.venv/Scripts/hf.exe download Systran/faster-whisper-large-v3 --include m
 
 Requires an NVIDIA CUDA-capable GPU, compatible driver, and enough available VRAM. NVIDIA DLLs from the virtual environment are added to the loader path explicitly. Model downloads are a setup step: the running service uses local files only. Set `-Model` to the downloaded snapshot directory if using a custom cache location. FFmpeg on PATH is recommended for URL media handling. A failed CUDA initialization rejects jobs instead of selecting CPU.
 
-Open `http://127.0.0.1:8765` on the PC. The access key is generated in `%LOCALAPPDATA%/LocalTranscriber/access-token.txt`. Do not commit or publish it. The browser stores it for the current session only.
+Open `http://127.0.0.1:18765` on the PC. The access key is generated in `%LOCALAPPDATA%/LocalTranscriber/access-token.txt`. Do not commit or publish it. The browser stores it for the current session only.
 
 ## Phone, including mobile data
 
 Install Tailscale on both devices and sign in to the same private network. Once connected, use:
 
 ```powershell
-tailscale serve --bg http://127.0.0.1:8765
+tailscale serve --bg http://127.0.0.1:18765
 ```
 
-Follow Tailscale's HTTPS enablement prompt if needed. Open the private HTTPS address printed by Tailscale on the phone and enter the access key. Keep Tailscale connected. Do not enable Funnel or expose port 8765 to the public internet. This setup does not require a router port forward. Network setup and account login must be completed before mobile-data access works.
+Follow Tailscale's HTTPS enablement prompt if needed. Open the private HTTPS address printed by Tailscale on the phone and enter the access key. Keep Tailscale connected. Do not enable Funnel or expose port 18765 to the public internet. This setup does not require a router port forward. Network setup and account login must be completed before mobile-data access works.
 
 ## Behavior and limitations
 

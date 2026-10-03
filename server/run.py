@@ -16,5 +16,5 @@ logging.basicConfig(stream=log, level=logging.INFO)
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("app:create_app", factory=True, host="127.0.0.1", port=8765,
+    uvicorn.run("app:create_app", factory=True, host="127.0.0.1", port=int(config.get("port", 18765)),
                 workers=1, access_log=False)

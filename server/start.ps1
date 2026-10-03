@@ -2,7 +2,7 @@ param(
     [string]$Python = "$PSScriptRoot/.venv/Scripts/python.exe",
     [string]$Model = "large-v3",
     [string]$Data = "$env:LOCALAPPDATA/LocalTranscriber",
-    [int]$Port = 8765
+    [int]$Port = 18765
 )
 $ErrorActionPreference = 'Stop'
 $env:LT_MODEL = $Model
