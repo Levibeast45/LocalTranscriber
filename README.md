@@ -26,6 +26,11 @@ Open LocalTranscriber, wait for the model to load, then choose a local file or
 paste a public media link and tap **Transcribe link**. You can also share a link
 from another app; review the prefilled link and tap **Transcribe link**.
 
+After transcription, **Copy all** copies the complete formatted text. **Export
+TXT** saves UTF-8 text and **Export Word** saves a real `.docx` document, with
+paragraph breaks preserved. Both exports open Android's save dialog so you can
+choose the destination. Exporting runs locally and needs no extra storage permission.
+
 The APK has a separate identity from VoiceSkip. This is a debug build for
 personal testing; see [architecture and limitations](docs/url-transcription.md),
 including signing-key differences between CI runs.

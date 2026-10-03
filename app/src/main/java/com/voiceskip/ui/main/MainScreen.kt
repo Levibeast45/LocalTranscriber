@@ -799,6 +799,7 @@ private fun TranscribingScreen(
             }
 
             Spacer(modifier = Modifier.height(8.dp))
+            TranscriptExportActions(text = formatText(transcriptionResult.text))
 
             Row(
                 modifier = Modifier.fillMaxWidth(),

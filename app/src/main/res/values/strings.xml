@@ -173,4 +173,12 @@
     <string name="url_privacy">The media is downloaded first. Transcription runs on this device.</string>
     <string name="state_downloading">Downloading audio</string>
     <string name="url_downloading">Retrieving and preparing audio…</string>
+    <string name="copy_all">Copy all</string>
+    <string name="transcript_copied">Transcription copied</string>
+    <string name="copy_failed">Could not copy this text. Try exporting it instead.</string>
+    <string name="export_txt">Export TXT</string>
+    <string name="export_word">Export Word</string>
+    <string name="export_saving">Saving…</string>
+    <string name="export_saved">Transcription saved</string>
+    <string name="export_failed">Could not save the file. Check the destination and available space, then try again.</string>
 </resources>
