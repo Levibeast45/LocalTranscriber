@@ -8,6 +8,40 @@ import pytest
 from app import create_app, validate_url
 
 
+def test_missing_config_restored_from_backup(tmp_path):
+    import json
+    from configuration import load_config
+    model = tmp_path / 'model'
+    model.mkdir()
+    config = {'data': str(tmp_path), 'model': str(model), 'port': 18765}
+    path = tmp_path / 'config.json'
+    path.write_text(json.dumps(config))
+    load_config(path)
+    path.unlink()
+    assert load_config(path) == config
+    assert json.loads(path.read_text()) == config
+
+
+def test_missing_config_recovers_cached_model(tmp_path, monkeypatch):
+    from configuration import load_config
+    cache = tmp_path / 'cache'
+    monkeypatch.setenv('HF_HUB_CACHE', str(cache))
+    model = cache / 'models--Systran--faster-whisper-large-v3/snapshots/test'
+    model.mkdir(parents=True)
+    for name in ('model.bin', 'config.json', 'tokenizer.json'):
+        (model / name).write_text('test')
+    path = tmp_path / 'data/config.json'
+    assert load_config(path)['model'] == str(model)
+    assert path.exists()
+
+
+def test_missing_config_missing_model_is_explicit(tmp_path, monkeypatch):
+    from configuration import load_config
+    monkeypatch.setenv('HF_HUB_CACHE', str(tmp_path / 'empty'))
+    with pytest.raises(RuntimeError, match='Large-v3 introuvable'):
+        load_config(tmp_path / 'config.json')
+
+
 class FakeEngine:
     def load(self):
         pass

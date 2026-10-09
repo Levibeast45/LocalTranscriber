@@ -4,8 +4,9 @@ import logging
 import os
 from pathlib import Path
 import sys
+from configuration import load_config
 
-config = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+config = load_config(Path(sys.argv[1]))
 data = Path(config["data"])
 data.mkdir(parents=True, exist_ok=True)
 os.environ["LT_DATA"] = str(data)

@@ -7,11 +7,12 @@ import sys
 import time
 import urllib.request
 import webbrowser
+from configuration import load_config
 
 
 def main():
     config_path = Path(sys.argv[1]).resolve()
-    config = json.loads(config_path.read_text(encoding="utf-8"))
+    config = load_config(config_path)
     data = Path(config["data"])
     url = f'http://127.0.0.1:{int(config.get("port", 18765))}'
 

@@ -7,9 +7,10 @@ import socket
 import subprocess
 import sys
 import time
+from configuration import load_config
 
 config_path = Path(sys.argv[1]).resolve()
-config = json.loads(config_path.read_text(encoding="utf-8"))
+config = load_config(config_path)
 data = Path(config["data"])
 data.mkdir(parents=True, exist_ok=True)
 lock = (data / "supervisor.lock").open("a+b")
