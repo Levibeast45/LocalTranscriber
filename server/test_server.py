@@ -8,6 +8,20 @@ import pytest
 from app import create_app, validate_url
 
 
+def test_launcher_auth_failure_does_not_start_another_server(tmp_path, monkeypatch):
+    import launch
+    import urllib.error
+    monkeypatch.setattr(launch.sys, 'argv', ['launch.py', str(tmp_path / 'config.json')])
+    monkeypatch.setattr(launch, 'load_config', lambda _: {'data': str(tmp_path), 'port': 18765})
+    (tmp_path / 'access-token.txt').write_text('test-key')
+    def denied(*args, **kwargs):
+        raise urllib.error.HTTPError('http://localhost', 401, 'Unauthorized', {}, None)
+    monkeypatch.setattr(launch.urllib.request, 'urlopen', denied)
+    monkeypatch.setattr(launch.subprocess, 'Popen', lambda *a, **kw: pytest.fail('Duplicate server started'))
+    with pytest.raises(RuntimeError, match='cle locale ne correspond pas'):
+        launch.main()
+
+
 def test_missing_config_restored_from_backup(tmp_path):
     import json
     from configuration import load_config

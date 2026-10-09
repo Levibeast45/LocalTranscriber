@@ -6,6 +6,7 @@ import subprocess
 import sys
 import time
 import urllib.request
+import urllib.error
 import webbrowser
 from configuration import load_config
 
@@ -22,6 +23,10 @@ def main():
             request = urllib.request.Request(url + "/api/health", headers={"Authorization": "Bearer " + token})
             with urllib.request.urlopen(request, timeout=2) as response:
                 return json.load(response)
+        except urllib.error.HTTPError as error:
+            if error.code in (401, 403):
+                raise RuntimeError('Le serveur repond mais la cle locale ne correspond pas. Verifie que les lanceurs utilisent le meme dossier de donnees : ' + str(data)) from None
+            raise RuntimeError('Le serveur repond avec une erreur HTTP ' + str(error.code)) from None
         except (OSError, ValueError):
             return None
 
