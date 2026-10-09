@@ -1,6 +1,6 @@
-# VoiceSkip
+# LocalTranscriber
 
-Android app for audio/video transcription using whisper.cpp.
+Android app for local audio/video transcription using whisper.cpp, forked from [VoiceSkip](https://github.com/tguillem/VoiceSkip).
 
 ## Features
 
@@ -12,7 +12,28 @@ Android app for audio/video transcription using whisper.cpp.
   model (ggml-small-q8_0)
 - Background transcription with foreground service
 - Listen mode: play audio and review your transcription
-- Fully offline and open source
+- Local transcription; internet is used only when retrieving URL media
+- Paste a media link or use Android Share → LocalTranscriber
+
+## Install on S24 Ultra
+
+Open the latest successful **Android APK** run in this repository's Actions tab.
+Download **LocalTranscriber-arm64-debug**, extract the ZIP and install the APK
+on your phone. Allow installation from the app you use to open the APK when
+Android asks. No root is required. The models are bundled, so the APK is large.
+
+Open LocalTranscriber, wait for the model to load, then choose a local file or
+paste a public media link and tap **Transcribe link**. You can also share a link
+from another app; review the prefilled link and tap **Transcribe link**.
+
+After transcription, **Copy all** copies the complete formatted text. **Export
+TXT** saves UTF-8 text and **Export Word** saves a real `.docx` document, with
+paragraph breaks preserved. Both exports open Android's save dialog so you can
+choose the destination. Exporting runs locally and needs no extra storage permission.
+
+The APK has a separate identity from VoiceSkip. This is a debug build for
+personal testing; see [architecture and limitations](docs/url-transcription.md),
+including signing-key differences between CI runs.
 
 ## Supported Languages
 
@@ -90,3 +111,7 @@ Foundation, either version 3 of the License, or (at your option) any later
 version.
 
 See [LICENSE](LICENSE) for details.
+
+### Experimental S24 Ultra GPU trial (1.0.9)
+
+GPU acceleration is now opt-in and starts disabled, including after an update. The native policy permits Adreno 750 for an explicit trial; other Adreno, Xclipse and PowerVR devices remain blocked. Enable **GPU acceleration (experimental)** in Settings, then test a short recording before a long job. Successful model loading alone does not validate transcription stability or speed. Recoverable errors retain CPU fallback; after a native crash, restart the app to allow the existing crash marker to disable GPU. A failed GPU context cannot be retried in the same process. Hardware validation on the S24 Ultra is still required.

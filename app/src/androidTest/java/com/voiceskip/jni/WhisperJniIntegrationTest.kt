@@ -262,7 +262,8 @@ class WhisperJniIntegrationTest {
 
         assertTrue(
             "Blocklisted GPU reported as active: ${loaded.gpuInfo}",
-            loaded.gpuInfo?.contains("Adreno") != true
+            loaded.gpuInfo?.contains("Adreno") != true ||
+                Regex("""Adreno(?: \(TM\))? 750(?:$|[ )])""").containsMatchIn(loaded.gpuInfo.orEmpty())
         )
 
         assumeTrue(

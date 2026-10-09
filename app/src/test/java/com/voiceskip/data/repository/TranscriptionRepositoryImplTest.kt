@@ -196,7 +196,7 @@ class TranscriptionRepositoryImplTest {
 
     @Test
     fun `transcribeUri transitions to Transcribing`() = runTest {
-        val uri = mockk<Uri>()
+        val uri = mockk<Uri> { every { scheme } returns "content" }
 
         every { mockFileTranscriptionUseCase.execute(any(), any(), any(), any(), any()) } returns
             flowOf()
@@ -214,7 +214,7 @@ class TranscriptionRepositoryImplTest {
 
     @Test
     fun `transcribeUri does nothing if not in Idle`() = runTest {
-        val uri = mockk<Uri>()
+        val uri = mockk<Uri> { every { scheme } returns "content" }
 
         every { mockLiveTranscriptionUseCase.execute(any(), any(), any(), any()) } returns flowOf()
         every { mockFileTranscriptionUseCase.execute(any(), any(), any(), any(), any()) } returns
@@ -233,7 +233,7 @@ class TranscriptionRepositoryImplTest {
 
     @Test
     fun `file transcription emits Transcribing progress`() = runTest {
-        val uri = mockk<Uri>()
+        val uri = mockk<Uri> { every { scheme } returns "content" }
         val segments = listOf(WhisperSegment("Test", 0, 1000))
         val transcribingProgress = FileTranscriptionUseCase.Progress.Transcribing(
             progressPercent = 50,
@@ -261,7 +261,7 @@ class TranscriptionRepositoryImplTest {
 
     @Test
     fun `file transcription updates progress flow`() = runTest {
-        val uri = mockk<Uri>()
+        val uri = mockk<Uri> { every { scheme } returns "content" }
         val transcribingProgress = FileTranscriptionUseCase.Progress.Transcribing(
             progressPercent = 75,
             segments = emptyList(),
@@ -283,7 +283,7 @@ class TranscriptionRepositoryImplTest {
 
     @Test
     fun `file transcription completes to Complete state`() = runTest {
-        val uri = mockk<Uri>()
+        val uri = mockk<Uri> { every { scheme } returns "content" }
         val segments = listOf(WhisperSegment("Transcribed text", 0, 5000, "en"))
         val completeProgress = FileTranscriptionUseCase.Progress.Complete(
             segments = segments,
@@ -312,7 +312,7 @@ class TranscriptionRepositoryImplTest {
 
     @Test
     fun `file decoder failure transitions to Error`() = runTest {
-        val uri = mockk<Uri>()
+        val uri = mockk<Uri> { every { scheme } returns "content" }
 
         every { mockFileTranscriptionUseCase.execute(any(), any(), any(), any(), any()) } returns
             flow { throw IOException("Failed to instantiate extractor") }
@@ -328,7 +328,7 @@ class TranscriptionRepositoryImplTest {
 
     @Test
     fun `cancelTranscription returns to Idle`() = runTest {
-        val uri = mockk<Uri>()
+        val uri = mockk<Uri> { every { scheme } returns "content" }
 
         every { mockFileTranscriptionUseCase.execute(any(), any(), any(), any(), any()) } returns
             flowOf()
@@ -344,7 +344,7 @@ class TranscriptionRepositoryImplTest {
 
     @Test
     fun `clearState returns to Idle from Complete`() = runTest {
-        val uri = mockk<Uri>()
+        val uri = mockk<Uri> { every { scheme } returns "content" }
         val completeProgress = FileTranscriptionUseCase.Progress.Complete(
             segments = emptyList(),
             detectedLanguage = null,
@@ -367,7 +367,7 @@ class TranscriptionRepositoryImplTest {
 
     @Test
     fun `clearState clears current source`() = runTest {
-        val uri = mockk<Uri>()
+        val uri = mockk<Uri> { every { scheme } returns "content" }
         val completeProgress = FileTranscriptionUseCase.Progress.Complete(
             segments = emptyList(),
             detectedLanguage = null,
@@ -500,7 +500,7 @@ class TranscriptionRepositoryImplTest {
 
     @Test
     fun `stopTranscription resets progress to 0`() = runTest {
-        val uri = mockk<Uri>()
+        val uri = mockk<Uri> { every { scheme } returns "content" }
         val transcribingProgress = FileTranscriptionUseCase.Progress.Transcribing(
             progressPercent = 50,
             segments = emptyList(),
@@ -517,6 +517,41 @@ class TranscriptionRepositoryImplTest {
         advanceUntilIdle()
 
         assertThat(repository.progress.value).isEqualTo(0)
+    }
+
+    @Test
+    fun `URL download progress is visible and completed remote URI is not saved for playback`() = runTest {
+        val uri = mockk<Uri> { every { scheme } returns "https" }
+        val proceed = kotlinx.coroutines.CompletableDeferred<Unit>()
+        every { mockFileTranscriptionUseCase.execute(any(), any(), any(), any(), any()) } returns flow {
+            emit(FileTranscriptionUseCase.Progress.Downloading(42))
+            proceed.await()
+            emit(FileTranscriptionUseCase.Progress.Complete(emptyList(), "en", 1000, 200))
+        }
+        repository.transcribeUri(uri)
+        runCurrent()
+        val downloading = repository.state.value as TranscriptionState.Transcribing
+        assertThat(downloading.downloading).isTrue()
+        assertThat(downloading.progress).isEqualTo(42)
+        proceed.complete(Unit)
+        advanceUntilIdle()
+        assertThat((repository.state.value as TranscriptionState.Complete).audioUri).isNull()
+    }
+
+    @Test
+    fun `cancel download stops work and returns to idle`() = runTest {
+        val uri = mockk<Uri> { every { scheme } returns "https" }
+        var cancelled = false
+        every { mockFileTranscriptionUseCase.execute(any(), any(), any(), any(), any()) } returns flow {
+            emit(FileTranscriptionUseCase.Progress.Downloading(12))
+            try { kotlinx.coroutines.awaitCancellation() } finally { cancelled = true }
+        }
+        repository.transcribeUri(uri)
+        runCurrent()
+        repository.cancelTranscription()
+        advanceUntilIdle()
+        assertThat(cancelled).isTrue()
+        assertThat(repository.state.value).isEqualTo(TranscriptionState.Idle)
     }
 
 }

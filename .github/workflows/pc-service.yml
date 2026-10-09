@@ -1,0 +1,17 @@
+name: PC service
+on:
+  pull_request:
+    paths: ['server/**', '.github/workflows/pc-service.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install fastapi uvicorn python-multipart python-docx pytest httpx av
+      - run: PYTHONPATH=server python -m pytest server/test_server.py -q

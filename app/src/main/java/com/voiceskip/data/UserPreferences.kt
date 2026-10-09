@@ -27,7 +27,7 @@ class UserPreferences(private val context: Context) {
         private val TRANSLATE_KEY = booleanPreferencesKey("translate_to_english")
         private val MODEL_KEY = stringPreferencesKey("model")
         private val NUM_THREADS_KEY = intPreferencesKey("num_threads")
-        private val GPU_ENABLED_KEY = booleanPreferencesKey("gpu_enabled")
+        private val GPU_ENABLED_KEY = booleanPreferencesKey("gpu_experimental_v2")
         private val DEFAULT_LANGUAGE_KEY = stringPreferencesKey("default_language")
         private const val KEY_GPU_IN_PROGRESS = "gpu_in_progress"
         private const val KEY_TURBO_LOAD_IN_PROGRESS = "turbo_load_in_progress"
@@ -183,7 +183,7 @@ class UserPreferences(private val context: Context) {
     }
 
     val gpuEnabled: Flow<Boolean> = context.dataStore.data.map { preferences ->
-        preferences[GPU_ENABLED_KEY] ?: true
+        preferences[GPU_ENABLED_KEY] ?: false
     }
 
     val turboModeEnabled: Flow<Boolean> = context.dataStore.data.map { preferences ->
@@ -199,7 +199,7 @@ class UserPreferences(private val context: Context) {
     }
 
     val numThreads: Flow<Int> = context.dataStore.data.map { preferences ->
-        val isGpuEnabled = preferences[GPU_ENABLED_KEY] ?: true
+        val isGpuEnabled = preferences[GPU_ENABLED_KEY] ?: false
         preferences[NUM_THREADS_KEY] ?: getDefaultNumThreads(isGpuEnabled)
     }
 

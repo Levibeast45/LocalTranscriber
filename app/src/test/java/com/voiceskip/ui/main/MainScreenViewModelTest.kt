@@ -252,7 +252,7 @@ class MainScreenViewModelTest {
 
     @Test
     fun `GPU failure retries original file after CPU model reload`() = runTest {
-        val uri = mockk<Uri>()
+        val uri = mockk<Uri> { every { scheme } returns "content" }
         val model = "ggml-small.bin"
 
         modelStateFlow.value = ModelManager.ModelState.Loaded(model, "Adreno 730")
@@ -304,7 +304,7 @@ class MainScreenViewModelTest {
     fun `GPU failure stops retrying when the CPU model fails to load`() = runTest {
         modelStateFlow.value = ModelManager.ModelState.Loaded("ggml-small.bin", "Adreno 730")
         fakeTranscriptionRepository.setCurrentTranscriptionSource(
-            TranscriptionSource.FileUri(mockk<Uri>())
+            TranscriptionSource.FileUri(mockk<Uri> { every { scheme } returns "content" })
         )
 
         fakeTranscriptionRepository.setState(
@@ -378,7 +378,7 @@ class MainScreenViewModelTest {
 
     @Test
     fun `audio document name is resolved once while playback position changes`() = runTest {
-        val uri = mockk<Uri>()
+        val uri = mockk<Uri> { every { scheme } returns "content" }
         coEvery { mockAudioListenUseCase.getFileNameFromUri(uri) } returns "meeting.opus"
         fakeTranscriptionRepository.setCurrentTranscriptionSource(
             TranscriptionSource.FileUri(uri)
@@ -415,8 +415,8 @@ class MainScreenViewModelTest {
 
     @Test
     fun `new audio URI does not wait for the previous display name`() = runTest {
-        val firstUri = mockk<Uri>()
-        val secondUri = mockk<Uri>()
+        val firstUri = mockk<Uri> { every { scheme } returns "content" }
+        val secondUri = mockk<Uri> { every { scheme } returns "content" }
         val firstLookupStarted = CompletableDeferred<Unit>()
         coEvery { mockAudioListenUseCase.getFileNameFromUri(firstUri) } coAnswers {
             firstLookupStarted.complete(Unit)
@@ -456,7 +456,7 @@ class MainScreenViewModelTest {
 
     @Test
     fun `unavailable file selection is saved before permission completes`() = runTest {
-        val uri = mockk<Uri>()
+        val uri = mockk<Uri> { every { scheme } returns "content" }
         val permissionGate = CompletableDeferred<Unit>()
         coEvery { mockAudioListenUseCase.takePersistablePermission(uri) } coAnswers {
             permissionGate.await()
@@ -474,8 +474,8 @@ class MainScreenViewModelTest {
         modelStateFlow.value = ModelManager.ModelState.Loaded("models/test.bin", "Test GPU")
         fakeTranscriptionRepository.setState(TranscriptionState.Idle)
         advanceUntilIdle()
-        val firstUri = mockk<Uri>()
-        val secondUri = mockk<Uri>()
+        val firstUri = mockk<Uri> { every { scheme } returns "content" }
+        val secondUri = mockk<Uri> { every { scheme } returns "content" }
         val firstPermissionStarted = CompletableDeferred<Unit>()
         val firstPermissionGate = CompletableDeferred<Unit>()
         coEvery { mockAudioListenUseCase.takePersistablePermission(firstUri) } coAnswers {
@@ -507,9 +507,10 @@ class MainScreenViewModelTest {
     @Test
     fun `handleIncomingIntent waits for model before starting transcription`() = runTest {
         modelStateFlow.value = ModelManager.ModelState.NotLoaded
-        val testUri = mockk<Uri>()
+        val testUri = mockk<Uri> { every { scheme } returns "content" }
         val intent = mockk<Intent> {
             every { action } returns Intent.ACTION_SEND
+            every { type } returns "audio/*"
             every { getStringExtra("language") } returns null
             every { getParcelableExtraCompat<Uri>(Intent.EXTRA_STREAM) } returns testUri
         }
@@ -531,9 +532,10 @@ class MainScreenViewModelTest {
     @Test
     fun `handleIncomingIntent does not start transcription on model error`() = runTest {
         modelStateFlow.value = ModelManager.ModelState.Error(RuntimeException("Failed"))
-        val testUri = mockk<Uri>()
+        val testUri = mockk<Uri> { every { scheme } returns "content" }
         val intent = mockk<Intent> {
             every { action } returns Intent.ACTION_SEND
+            every { type } returns "audio/*"
             every { getStringExtra("language") } returns null
             every { getParcelableExtraCompat<Uri>(Intent.EXTRA_STREAM) } returns testUri
         }
@@ -544,6 +546,58 @@ class MainScreenViewModelTest {
         // URI saved but service not started due to model error
         assertThat(savedStateHandle.get<Uri>("pending_uri")).isEqualTo(testUri)
         coVerify(exactly = 0) { mockServiceLauncher.startFileTranscription(any(), any()) }
+    }
+
+    @Test
+    fun `shared links populate draft without downloading or asking for file permission`() = runTest {
+        val intent = mockk<Intent> {
+            every { action } returns Intent.ACTION_SEND
+            every { type } returns "text/plain"
+            every { getStringExtra("language") } returns null
+            every { getStringExtra(Intent.EXTRA_TEXT) } returns "A video https://example.com/watch?v=1"
+        }
+        viewModel.handleIncomingIntent(intent)
+        advanceUntilIdle()
+        assertThat(viewModel.urlDraft.value).isEqualTo("A video https://example.com/watch?v=1")
+        coVerify(exactly = 0) { mockServiceLauncher.startFileTranscription(any(), any()) }
+        coVerify(exactly = 0) { mockAudioListenUseCase.takePersistablePermission(any()) }
+    }
+
+    @Test
+    fun `invalid URL never launches foreground work`() = runTest {
+        modelStateFlow.value = ModelManager.ModelState.Loaded("models/test.bin", null)
+        advanceUntilIdle()
+        viewModel.handleAction(MainScreenAction.EditUrl("file:///private/file"))
+        viewModel.handleAction(MainScreenAction.TranscribeUrl)
+        advanceUntilIdle()
+        coVerify(exactly = 0) { mockServiceLauncher.startFileTranscription(any(), any()) }
+    }
+
+    @Test
+    fun `URL draft survives view model recreation`() = runTest {
+        viewModel.handleAction(MainScreenAction.EditUrl("https://example.com/audio.mp3"))
+        createViewModel()
+        assertThat(viewModel.urlDraft.value).isEqualTo("https://example.com/audio.mp3")
+    }
+
+    @Test
+    fun `URL submission launches service without content permission or listen playback`() = runTest {
+        val url = "https://example.com/audio.mp3"
+        val uri = mockk<Uri> { every { scheme } returns "https" }
+        mockkStatic(Uri::class)
+        try {
+            every { Uri.parse(url) } returns uri
+            modelStateFlow.value = ModelManager.ModelState.Loaded("models/test.bin", null)
+            advanceUntilIdle()
+            viewModel.handleAction(MainScreenAction.EditUrl(url))
+            viewModel.handleAction(MainScreenAction.TranscribeUrl)
+            advanceUntilIdle()
+            coVerify(exactly = 1) { mockServiceLauncher.startFileTranscription(uri, any()) }
+            coVerify(exactly = 0) { mockAudioListenUseCase.takePersistablePermission(any()) }
+            coVerify(exactly = 0) { mockAudioListenUseCase.prepareIfListenModeEnabled(any(), any()) }
+        } finally {
+            io.mockk.unmockkStatic(Uri::class)
+        }
     }
 
 }

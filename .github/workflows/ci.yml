@@ -1,35 +1,67 @@
-name: CI
+name: Android APK
 
 on:
   push:
     branches: [main]
   pull_request:
     branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  test:
-    runs-on: ubuntu-latest
-
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up JDK 17
-        uses: actions/setup-java@v4
+      - uses: actions/checkout@v5
+        with:
+          lfs: true
+      - uses: actions/setup-java@v5
         with:
           java-version: '17'
-          distribution: 'temurin'
-
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v4
-
-      - name: Run unit tests with coverage
-        run: ./gradlew testDebugUnitTest jacocoTestReport
-
-      - name: Upload test results
+          distribution: temurin
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+          log-accepted-android-sdk-licenses: false
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Install Android native toolchain
+        run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0' 'ndk;28.1.13356709' 'cmake;3.22.1'
+      - name: Verify bundled models are real files, not LFS pointers
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          models = list(Path('models_pack/src/main/assets/models').glob('*.bin'))
+          assert len(models) == 3, 'Expected base, small and VAD models'
+          for model in models:
+              assert model.stat().st_size > 100_000, f'Missing LFS model: {model}'
+          PY
+      - name: Test native GPU allowlist
+        run: |
+          cc -std=c11 -Wall -Wextra -Werror lib/src/test/native/gpu_policy_test.c -o /tmp/gpu-policy-test
+          /tmp/gpu-policy-test
+      - name: Test, lint and build signed debug APK for ARM64
+        run: ./gradlew testDebugUnitTest jacocoTestReport lintDebug assembleDebug -PtargetAbi=arm64-v8a --stacktrace
+      - name: Verify APK signature
+        run: "$ANDROID_HOME/build-tools/36.0.0/apksigner verify --verbose app/build/outputs/apk/debug/app-debug.apk"
+      - name: Upload installable APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: LocalTranscriber-arm64-debug
+          path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 30
+      - name: Upload verification reports
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: test-results
+          name: verification-reports
           path: |
-            app/build/reports/tests/
-            app/build/reports/jacoco/
+            app/build/reports/
+            app/build/test-results/

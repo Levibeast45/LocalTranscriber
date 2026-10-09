@@ -8,6 +8,7 @@ import android.net.Uri
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.voiceskip.media.MediaUrl
 import com.voiceskip.data.ErrorHandler
 import com.voiceskip.data.UserPreferences
 import com.voiceskip.data.repository.PlaybackState
@@ -109,6 +110,7 @@ data class MainScreenUiState(
     val transcriptionResult: TranscriptionResult? = null,
     val transcriptionSegments: List<WhisperSegment> = emptyList(),
     val transcriptionProgress: Int = 0,
+    val downloading: Boolean = false,
     val detectedLanguage: String? = null,
     val canTranscribe: Boolean = false,
     val hasSavedTranscription: Boolean = false,
@@ -140,6 +142,8 @@ sealed class MainScreenAction {
     object ToggleRecord : MainScreenAction()
     data class SelectFile(val uri: Uri) : MainScreenAction()
     object RequestFileSelection : MainScreenAction()
+    data class EditUrl(val text: String) : MainScreenAction()
+    object TranscribeUrl : MainScreenAction()
     object StopTranscription : MainScreenAction()
     object ClearResult : MainScreenAction()
     object RetryLoadModel : MainScreenAction()
@@ -168,6 +172,8 @@ class MainScreenViewModel @Inject constructor(
     private val savedStateHandle: SavedStateHandle,
     private val formatSentencesUseCase: FormatSentencesUseCase
 ) : ViewModel() {
+
+    val urlDraft = savedStateHandle.getStateFlow("url_draft", "")
 
     private val _showFileSelector = MutableStateFlow(false)
     private val _pendingDelete = MutableStateFlow<SavedTranscription?>(null)
@@ -299,6 +305,7 @@ class MainScreenViewModel @Inject constructor(
             )
             is TranscriptionState.Transcribing -> baseState.copy(
                 screenState = TranscriptionUiState.Transcribing,
+                downloading = repoState.downloading,
                 transcriptionSegments = repoState.segments,
                 transcriptionProgress = repoState.progress,
                 detectedLanguage = repoState.detectedLanguage
@@ -397,7 +404,9 @@ class MainScreenViewModel @Inject constructor(
             is TranscriptionSource.FileUri -> {
                 val defaultLang = language ?: settingsRepository.userSettings.first().defaultLanguage
                 serviceLauncher.startFileTranscription(source.uri, language = defaultLang)
-                audioListenUseCase.prepareIfListenModeEnabled(source.uri, uiState.value.listenModeEnabled)
+                if (source.uri.scheme?.lowercase() !in setOf("http", "https")) {
+                    audioListenUseCase.prepareIfListenModeEnabled(source.uri, uiState.value.listenModeEnabled)
+                }
             }
         }
     }
@@ -417,6 +426,11 @@ class MainScreenViewModel @Inject constructor(
                 viewLastTranscription()
             }
             Intent.ACTION_SEND -> {
+                if (intent.type == "text/plain") {
+                    savedStateHandle["url_draft"] = intent.getStringExtra(Intent.EXTRA_TEXT).orEmpty()
+                    repository.clearState()
+                    return
+                }
                 val uri = intent.getParcelableExtraCompat<Uri>(Intent.EXTRA_STREAM)
                 uri?.let {
                     savedStateHandle["pending_uri"] = uri
@@ -473,6 +487,8 @@ class MainScreenViewModel @Inject constructor(
 
     fun handleAction(action: MainScreenAction) {
         when (action) {
+            is MainScreenAction.EditUrl -> savedStateHandle.set("url_draft", action.text)
+            is MainScreenAction.TranscribeUrl -> transcribeUrl()
             is MainScreenAction.ToggleRecord -> toggleRecord()
             is MainScreenAction.SelectFile -> handleSelectedFile(action.uri)
             is MainScreenAction.RequestFileSelection -> requestFileSelection()
@@ -489,6 +505,17 @@ class MainScreenViewModel @Inject constructor(
             is MainScreenAction.PlayPause -> togglePlayPause()
             is MainScreenAction.SeekTo -> seekTo(action.positionMs)
             is MainScreenAction.SeekToSegment -> seekToSegment(action.segment)
+        }
+    }
+
+    private fun transcribeUrl() {
+        val url = MediaUrl.parse(urlDraft.value) ?: return
+        if (!uiState.value.canTranscribe) return
+        viewModelScope.launch {
+            if (repository.state.value != TranscriptionState.Idle) return@launch
+            audioListenUseCase.stopPlayback()
+            val language = settingsRepository.userSettings.first().defaultLanguage
+            serviceLauncher.startFileTranscription(Uri.parse(url), language)
         }
     }
 
@@ -619,6 +646,7 @@ class MainScreenViewModel @Inject constructor(
     private fun getAudioUri(state: TranscriptionState): Uri? = when (state) {
         is TranscriptionState.Transcribing ->
             (repository.getCurrentTranscriptionSource() as? TranscriptionSource.FileUri)?.uri
+                ?.takeUnless { it.scheme?.lowercase() in setOf("http", "https") }
         is TranscriptionState.Complete -> state.audioUri
         else -> null
     }

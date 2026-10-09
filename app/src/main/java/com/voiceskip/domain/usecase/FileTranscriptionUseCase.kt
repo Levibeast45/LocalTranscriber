@@ -10,6 +10,8 @@ import com.voiceskip.data.source.TranscriptionEvent
 import com.voiceskip.data.source.TranscriptionThreadCounts
 import com.voiceskip.data.source.WhisperDataSource
 import com.voiceskip.media.FileAudioProvider
+import com.voiceskip.media.UrlMediaDownloader
+import java.util.UUID
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.Flow
@@ -20,9 +22,11 @@ import javax.inject.Inject
 
 class FileTranscriptionUseCase @Inject constructor(
     @ApplicationContext private val context: Context,
-    private val whisperDataSource: WhisperDataSource
+    private val whisperDataSource: WhisperDataSource,
+    private val urlMediaDownloader: UrlMediaDownloader
 ) {
     sealed interface Progress {
+        data class Downloading(val percent: Int) : Progress
         data class Transcribing(
             val progressPercent: Int,
             val segments: List<WhisperSegment>,
@@ -60,12 +64,25 @@ class FileTranscriptionUseCase @Inject constructor(
         var currentSegments = listOf<WhisperSegment>()
         var detectedLanguage: String? = null
 
-        val audioProvider = when (source) {
-            is Source.FromFile -> FileAudioProvider(file = source.file)
-            is Source.FromUri -> FileAudioProvider(context = context, uri = source.uri)
-        }
-
+        var temporaryDirectory: File? = null
+        var providerToRelease: FileAudioProvider? = null
         try {
+            val audioProvider = when (source) {
+                is Source.FromFile -> FileAudioProvider(file = source.file)
+                is Source.FromUri -> if (source.uri.scheme?.lowercase() in setOf("http", "https")) {
+                    val directory = File(context.cacheDir, "url-media/${UUID.randomUUID()}")
+                    temporaryDirectory = directory
+                    send(Progress.Downloading(0))
+                    val file = urlMediaDownloader.download(source.uri.toString(), directory) {
+                        trySend(Progress.Downloading(it))
+                    }
+                    send(Progress.Transcribing(0, emptyList(), null))
+                    FileAudioProvider(file = file)
+                } else {
+                    FileAudioProvider(context = context, uri = source.uri)
+                }
+            }
+            providerToRelease = audioProvider
             audioProvider.startDecoding()
 
             val audioLengthMs = audioProvider.awaitDuration().coerceAtLeast(0L).toInt()
@@ -139,7 +156,11 @@ class FileTranscriptionUseCase @Inject constructor(
 
             eventJob.join()
         } finally {
-            audioProvider.release()
+            try {
+                providerToRelease?.release()
+            } finally {
+                temporaryDirectory?.deleteRecursively()
+            }
         }
     }
 }

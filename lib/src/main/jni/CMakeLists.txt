@@ -149,6 +149,15 @@ else()
     )
 endif()
 
+# Shader compilation runs on the build host, not the Android target. Use the
+# compiler shipped with the pinned NDK so a separate Vulkan SDK is not required.
+find_program(Vulkan_GLSLC_EXECUTABLE
+    NAMES glslc
+    HINTS "${CMAKE_ANDROID_NDK}/shader-tools/${ANDROID_HOST_TAG}"
+    NO_CMAKE_FIND_ROOT_PATH
+    REQUIRED
+)
+
 set(GGML_VULKAN ON CACHE BOOL "" FORCE)
 set(GGML_CPU_ARM_ARCH "" CACHE STRING "" FORCE)
 

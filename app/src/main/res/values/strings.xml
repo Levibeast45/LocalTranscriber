@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">VoiceSkip</string>
+    <string name="app_name">LocalTranscriber</string>
 
     <!-- Actions -->
     <string name="action_record">Record audio</string>
@@ -46,7 +46,7 @@
     <string name="tip_share_desc">Transcribe audio or video from any app</string>
 
     <!-- Messages -->
-    <string name="msg_gpu_unavailable">GPU unavailable, using CPU</string>
+    <string name="msg_gpu_unavailable">GPU initialization failed or device blocked; using CPU</string>
     <string name="msg_gpu_crash">GPU caused a crash, using CPU</string>
     <string name="msg_turbo_crash">Turbo mode caused a crash, disabled</string>
     <string name="msg_copied">Copied to clipboard</string>
@@ -104,12 +104,12 @@
 
     <!-- Settings - Performance -->
     <string name="settings_section_performance">Performance</string>
-    <string name="settings_gpu_title">GPU acceleration</string>
+    <string name="settings_gpu_title">GPU acceleration (experimental)</string>
     <string name="settings_gpu_device">Using %s</string>
     <string name="settings_gpu_loading">Loading model with GPU…</string>
-    <string name="settings_gpu_disabled">CPU-only processing</string>
+    <string name="settings_gpu_disabled">Off by default. Adreno 750 testing may crash the app.</string>
     <string name="settings_gpu_requires_vulkan_1_2">GPU acceleration requires Vulkan 1.2 or newer</string>
-    <string name="settings_gpu_failed">GPU acceleration failed</string>
+    <string name="settings_gpu_failed">GPU initialization failed or this GPU is blocked. Restart the app before retrying.</string>
     <string name="settings_threads_title">CPU threads</string>
     <string name="settings_threads_desc_gpu">CPU threads for hybrid GPU/CPU processing</string>
     <string name="settings_threads_desc_cpu">Number of CPU threads for processing</string>
@@ -134,7 +134,7 @@
 
     <!-- Settings - About -->
     <string name="settings_section_about">About</string>
-    <string name="settings_about_privacy">All processing happens locally on your device, ensuring complete privacy.</string>
+    <string name="settings_about_privacy">Speech recognition runs on your device. Media links are downloaded from their hosting services.</string>
     <string name="settings_about_version">Version</string>
     <string name="settings_about_license">License</string>
     <string name="settings_about_license_name">GPL-3.0-or-later</string>
@@ -166,4 +166,19 @@
     <string name="oss_whisper_copyright" translatable="false">Copyright (c) 2023–2024 The ggml authors</string>
     <string name="oss_whisper_license" translatable="false">MIT License</string>
     <string name="oss_jetpack_notice" translatable="false">Android Jetpack libraries are licensed under the Apache License 2.0.</string>
+    <string name="url_label">Media link</string>
+    <string name="url_hint">Paste one public HTTP or HTTPS link</string>
+    <string name="url_start">Transcribe link</string>
+    <string name="url_invalid">Enter one valid HTTP or HTTPS link.</string>
+    <string name="url_privacy">The media is downloaded first. Transcription runs on this device.</string>
+    <string name="state_downloading">Downloading audio</string>
+    <string name="url_downloading">Retrieving and preparing audio…</string>
+    <string name="copy_all">Copy all</string>
+    <string name="transcript_copied">Transcription copied</string>
+    <string name="copy_failed">Could not copy this text. Try exporting it instead.</string>
+    <string name="export_txt">Export TXT</string>
+    <string name="export_word">Export Word</string>
+    <string name="export_saving">Saving…</string>
+    <string name="export_saved">Transcription saved</string>
+    <string name="export_failed">Could not save the file. Check the destination and available space, then try again.</string>
 </resources>

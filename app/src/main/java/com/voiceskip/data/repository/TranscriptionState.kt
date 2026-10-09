@@ -30,7 +30,8 @@ sealed interface TranscriptionState {
         val progress: Int,
         val currentSegment: String?,
         val segments: List<WhisperSegment>,
-        val detectedLanguage: String? = null
+        val detectedLanguage: String? = null,
+        val downloading: Boolean = false
     ) : TranscriptionState
 
     data class Complete(
